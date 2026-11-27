@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#F8F9FA" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Filter Reminder</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #EEF1F6;
+      color: #1F1F1F;
+      height: 100%;
+    }
+    .app-shell {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      background-color: #F8F9FA;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
+    }
+    @media (max-width: 480px) {
+      .app-shell {
+        max-width: 100%;
+        box-shadow: none;
+      }
+      body {
+        background-color: #F8F9FA;
+      }
+    }
+    .sheet-backdrop {
+      transition: opacity 0.2s ease;
+    }
+    .sheet-panel {
+      transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .safe-pb {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <!-- Top Header -->
+    <header class="bg-[#F8F9FA] sticky top-0 z-20 pt-3">
+      <div class="px-5 pb-2 flex items-center justify-between">
+        <h1 id="headerTitle" class="text-[22px] font-medium tracking-tight text-[#1F1F1F]">Filter Reminder</h1>
+        <button id="headerSearchToggle" type="button" aria-label="Search" class="p-2 -mr-2 rounded-full text-[#444746] hover:bg-[#E8EAED] active:bg-[#DCE0E5] transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path stroke-linecap="round" d="M20 20l-3.5-3.5"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Collapsible Search Bar -->
+      <div id="searchBarWrap" class="hidden px-4 pb-2.5">
+        <div class="relative flex items-center">
+          <input id="searchInput" type="text" class="w-full bg-white border border-[#C4C7C5] rounded-xl pl-9 pr-9 py-2 text-sm text-[#1F1F1F] focus:outline-none focus:border-[#1A73E8]" placeholder="Поиск по месту или фильтру..." />
+          <svg class="w-4 h-4 text-[#747775] absolute left-3 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path stroke-linecap="round" d="M20 20l-3.5-3.5"></path>
+          </svg>
+          <button id="clearSearchBtn" type="button" class="hidden absolute right-2.5 p-1 text-[#747775] hover:text-[#1F1F1F]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs (Visible on Filters screen) -->
+      <nav id="tabsNav" class="grid grid-cols-3 border-b border-[#E0E3E7] bg-[#F8F9FA]">
+        <button type="button" data-tab="all" class="tab-btn relative py-3 text-sm font-medium text-center transition-colors">
+          <span class="tab-label">All</span>
+          <span class="tab-indicator absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A73E8] rounded-t-full"></span>
+        </button>
+        <button type="button" data-tab="overdue" class="tab-btn relative py-3 text-sm font-medium text-center transition-colors">
+          <span class="inline-flex items-center justify-center gap-1 relative">
+            <span class="tab-label">Overdue</span>
+            <span id="overdueBadge" class="hidden -mt-3 -ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#B3261E] text-white text-[11px] font-semibold leading-[18px] text-center">0</span>
+          </span>
+          <span class="tab-indicator hidden absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A73E8] rounded-t-full"></span>
+        </button>
+        <button type="button" data-tab="upcoming" class="tab-btn relative py-3 text-sm font-medium text-center transition-colors">
+          <span class="inline-flex items-center justify-center gap-1 relative">
+            <span class="tab-label">Upcoming</span>
+            <span id="upcomingBadge" class="hidden -mt-3 -ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#E37400] text-white text-[11px] font-semibold leading-[18px] text-center">0</span>
+          </span>
+          <span class="tab-indicator hidden absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#1A73E8] rounded-t-full"></span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto pb-28">
+      <!-- Filters View -->
+      <section id="filtersView" class="px-4 pt-3.5">
+        <!-- Sort Chips -->
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3.5">
+          <button type="button" data-sort="dueDate" class="sort-chip shrink-0 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors border"></button>
+          <button type="button" data-sort="type" class="sort-chip shrink-0 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors border"></button>
+          <button type="button" data-sort="name" class="sort-chip shrink-0 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors border"></button>
+        </div>
+
+        <!-- Filter Cards List -->
+        <div id="filterList" class="space-y-3"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden py-14 px-6 text-center">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <p id="emptyTitle" class="text-base font-medium text-[#1F1F1F] mb-1"></p>
+          <p id="emptySubtitle" class="text-sm text-[#5F6368]"></p>
+        </div>
+      </section>
+
+      <!-- Settings View -->
+      <section id="settingsView" class="hidden px-4 pt-4 space-y-4">
+        <!-- Language Card -->
+        <div class="bg-white rounded-2xl border border-[#E0E3E7] p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 id="setLangTitle" class="text-[15px] font-semibold text-[#1F1F1F]"></h2>
+              <p id="setLangDesc" class="text-xs text-[#5F6368] mt-0.5"></p>
+            </div>
+            <div class="inline-flex rounded-xl bg-[#F1F3F4] p-1">
+              <button type="button" data-lang="ru" class="lang-btn px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors">RU</button>
+              <button type="button" data-lang="en" class="lang-btn px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors">EN</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upcoming Threshold Card -->
+        <div class="bg-white rounded-2xl border border-[#E0E3E7] p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h2 id="setUpcomingTitle" class="text-[15px] font-semibold text-[#1F1F1F]"></h2>
+              <p id="setUpcomingDesc" class="text-xs text-[#5F6368] mt-0.5"></p>
+            </div>
+            <span id="upcomingDaysVal" class="text-sm font-semibold text-[#1A73E8] bg-[#E8F0FE] px-2.5 py-1 rounded-lg">14</span>
+          </div>
+          <div class="grid grid-cols-4 gap-2 mt-3">
+            <button type="button" data-days="7" class="threshold-btn py-2 rounded-xl text-xs font-medium border transition-colors">7</button>
+            <button type="button" data-days="14" class="threshold-btn py-2 rounded-xl text-xs font-medium border transition-colors">14</button>
+            <button type="button" data-days="21" class="threshold-btn py-2 rounded-xl text-xs font-medium border transition-colors">21</button>
+            <button type="button" data-days="30" class="threshold-btn py-2 rounded-xl text-xs font-medium border transition-colors">30</button>
+          </div>
+        </div>
+
+        <!-- Summary Stats Card -->
+        <div class="bg-white rounded-2xl border border-[#E0E3E7] p-4">
+          <h2 id="setStatsTitle" class="text-[15px] font-semibold text-[#1F1F1F] mb-3"></h2>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-[#F8F9FA] rounded-xl p-2.5">
+              <div id="statTotal" class="text-lg font-bold text-[#1F1F1F]">0</div>
+              <div id="statTotalLbl" class="text-[11px] text-[#5F6368]"></div>
+            </div>
+            <div class="bg-[#FCE8E6] rounded-xl p-2.5">
+              <div id="statOverdue" class="text-lg font-bold text-[#C5221F]">0</div>
+              <div id="statOverdueLbl" class="text-[11px] text-[#C5221F]"></div>
+            </div>
+            <div class="bg-[#E6F4EA] rounded-xl p-2.5">
+              <div id="statOk" class="text-lg font-bold text-[#137333]">0</div>
+              <div id="statOkLbl" class="text-[11px] text-[#137333]"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Backup & Reset Card -->
+        <div class="bg-white rounded-2xl border border-[#E0E3E7] p-4 space-y-2.5">
+          <h2 id="setDataTitle" class="text-[15px] font-semibold text-[#1F1F1F]"></h2>
+          <div class="flex flex-wrap gap-2">
+            <button id="exportBtn" type="button" class="flex-1 min-w-[120px] py-2.5 px-3 rounded-xl bg-[#E8F0FE] text-[#1967D2] text-xs font-semibold hover:bg-[#D2E3FC] active:scale-[0.99] transition"></button>
+            <label class="flex-1 min-w-[120px] py-2.5 px-3 rounded-xl bg-[#F1F3F4] text-[#1F1F1F] text-xs font-semibold text-center cursor-pointer hover:bg-[#E8EAED] active:scale-[0.99] transition">
+              <span id="importLbl"></span>
+              <input id="importInput" type="file" accept="application/json" class="hidden" />
+            </label>
+          </div>
+          <button id="resetDemoBtn" type="button" class="w-full py-2.5 px-3 rounded-xl border border-[#E0E3E7] text-[#5F6368] text-xs font-medium hover:bg-[#F8F9FA] transition"></button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Action Button (+ Add Filter) -->
+    <button id="addFilterFab" type="button" class="fixed bottom-24 right-4 sm:right-[max(1rem,calc(50%-224px))] z-20 inline-flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-[#D3E3FD] text-[#041E49] font-medium text-[15px] shadow-md hover:shadow-lg active:scale-[0.97] transition-all">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" d="M12 5v14M5 12h14"></path>
+      </svg>
+      <span id="fabLabel">Add Filter</span>
+    </button>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-[#F0F4F9] border-t border-[#E0E3E7] z-20 safe-pb">
+      <div class="grid grid-cols-2 pt-2 pb-1">
+        <button type="button" data-nav="filters" class="nav-btn flex flex-col items-center justify-center gap-1 py-1">
+          <span class="nav-pill px-5 py-1 rounded-full transition-colors">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
+            </svg>
+          </span>
+          <span id="navFiltersLbl" class="text-xs font-semibold">Filters</span>
+        </button>
+        <button type="button" data-nav="settings" class="nav-btn flex flex-col items-center justify-center gap-1 py-1">
+          <span class="nav-pill px-5 py-1 rounded-full transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </span>
+          <span id="navSettingsLbl" class="text-xs font-medium">Settings</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Detail Bottom Sheet Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 sheet-backdrop">
+      <div class="w-full max-w-[480px] bg-white rounded-t-3xl sm:rounded-3xl p-5 pb-7 shadow-xl sheet-panel">
+        <div class="w-10 h-1 bg-[#C4C7C5] rounded-full mx-auto mb-4 sm:hidden"></div>
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div class="flex items-center gap-3.5">
+            <div id="detailIconWrap" class="w-12 h-12 rounded-full flex items-center justify-center shrink-0"></div>
+            <div>
+              <h3 id="detailName" class="text-lg font-semibold text-[#1F1F1F]"></h3>
+              <p id="detailSub" class="text-sm text-[#5F6368]"></p>
+            </div>
+          </div>
+          <span id="detailStatusPill" class="px-3 py-1 rounded-full text-xs font-semibold shrink-0"></span>
+        </div>
+
+        <div class="bg-[#F8F9FA] rounded-2xl p-3.5 space-y-2 text-sm mb-5">
+          <div class="flex justify-between">
+            <span id="detailLastLbl" class="text-[#5F6368]"></span>
+            <span id="detailLastVal" class="font-medium text-[#1F1F1F]"></span>
+          </div>
+          <div class="flex justify-between">
+            <span id="detailNextLbl" class="text-[#5F6368]"></span>
+            <span id="detailNextVal" class="font-medium text-[#1F1F1F]"></span>
+          </div>
+          <div class="flex justify-between">
+            <span id="detailIntervalLbl" class="text-[#5F6368]"></span>
+            <span id="detailIntervalVal" class="font-medium text-[#1F1F1F]"></span>
+          </div>
+          <div id="detailNotesRow" class="hidden pt-1 border-t border-[#E0E3E7]">
+            <span id="detailNotesLbl" class="text-[#5F6368] block text-xs mb-0.5"></span>
+            <span id="detailNotesVal" class="text-[#1F1F1F] text-xs"></span>
+          </div>
+        </div>
+
+        <div id="detailActionsMain" class="space-y-2.5">
+          <button id="markReplacedBtn" type="button" class="w-full py-3 px-4 rounded-xl bg-[#1A73E8] text-white font-semibold text-sm hover:bg-[#1557B0] active:scale-[0.99] transition"></button>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button id="editFromDetailBtn" type="button" class="py-2.5 px-4 rounded-xl bg-[#F1F3F4] text-[#1F1F1F] font-medium text-sm hover:bg-[#E8EAED] transition"></button>
+            <button id="deleteConfirmTriggerBtn" type="button" class="py-2.5 px-4 rounded-xl bg-[#FCE8E6] text-[#C5221F] font-medium text-sm hover:bg-[#F9D2CE] transition"></button>
+          </div>
+          <button id="closeDetailBtn" type="button" class="w-full py-2 text-sm text-[#5F6368] font-medium hover:text-[#1F1F1F]"></button>
+        </div>
+
+        <!-- Inline Delete Confirmation -->
+        <div id="deleteConfirmBox" class="hidden space-y-3 pt-2 border-t border-[#E0E3E7]">
+          <p id="deleteConfirmText" class="text-sm text-[#1F1F1F] text-center font-medium"></p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button id="cancelDeleteBtn" type="button" class="py-2.5 rounded-xl bg-[#F1F3F4] text-[#1F1F1F] text-sm font-medium"></button>
+            <button id="confirmDeleteBtn" type="button" class="py-2.5 rounded-xl bg-[#C5221F] text-white text-sm font-semibold"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add / Edit Filter Modal -->
+    <div id="formModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 sheet-backdrop">
+      <form id="filterForm" class="w-full max-w-[480px] max-h-[92dvh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl p-5 pb-7 shadow-xl sheet-panel">
+        <div class="w-10 h-1 bg-[#C4C7C5] rounded-full mx-auto mb-4 sm:hidden"></div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 id="formTitle" class="text-lg font-semibold text-[#1F1F1F]"></h3>
+          <button id="closeFormBtn" type="button" class="p-1.5 rounded-full text-[#5F6368] hover:bg-[#F1F3F4]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-3.5">
+          <div>
+            <label id="lblLocation" for="inpLocation" class="block text-xs font-medium text-[#444746] mb-1"></label>
+            <input id="inpLocation" type="text" required class="w-full px-3.5 py-2.5 rounded-xl border border-[#C4C7C5] text-sm focus:outline-none focus:border-[#1A73E8]" />
+          </div>
+
+          <div>
+            <label id="lblCategory" class="block text-xs font-medium text-[#444746] mb-1.5"></label>
+            <div id="categoryGrid" class="grid grid-cols-3 gap-2"></div>
+          </div>
+
+          <div>
+            <label id="lblBrand" for="inpBrand" class="block text-xs font-medium text-[#444746] mb-1"></label>
+            <input id="inpBrand" type="text" class="w-full px-3.5 py-2.5 rounded-xl border border-[#C4C7C5] text-sm focus:outline-none focus:border-[#1A73E8]" />
+          </div>
+
+          <div>
+            <label id="lblInterval" for="inpInterval" class="block text-xs font-medium text-[#444746] mb-1.5"></label>
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button type="button" data-preset="30" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium border border-[#C4C7C5] bg-white hover:bg-[#F1F3F4]">30</button>
+              <button type="button" data-preset="60" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium border border-[#C4C7C5] bg-white hover:bg-[#F1F3F4]">60</button>
+              <button type="button" data-preset="90" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium border border-[#C4C7C5] bg-white hover:bg-[#F1F3F4]">90</button>
+              <button type="button" data-preset="180" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium border border-[#C4C7C5] bg-white hover:bg-[#F1F3F4]">180</button>
+              <button type="button" data-preset="365" class="preset-btn px-2.5 py-1 rounded-lg text-xs font-medium border border-[#C4C7C5] bg-white hover:bg-[#F1F3F4]">365</button>
+            </div>
+            <input id="inpInterval" type="number" min="1" max="1825" required class="w-full px-3.5 py-2.5 rounded-xl border border-[#C4C7C5] text-sm focus:outline-none focus:border-[#1A73E8]" />
+          </div>
+
+          <div>
+            <label id="lblLastReplaced" for="inpLastReplaced" class="block text-xs font-medium text-[#444746] mb-1"></label>
+            <input id="inpLastReplaced" type="date" required class="w-full px-3.5 py-2.5 rounded-xl border border-[#C4C7C5] text-sm focus:outline-none focus:border-[#1A73E8]" />
+          </div>
+
+          <div>
+            <label id="lblNotes" for="inpNotes" class="block text-xs font-medium text-[#444746] mb-1"></label>
+            <input id="inpNotes" type="text" class="w-full px-3.5 py-2.5 rounded-xl border border-[#C4C7C5] text-sm focus:outline-none focus:border-[#1A73E8]" />
+          </div>
+        </div>
+
+        <button id="saveFilterBtn" type="submit" class="w-full mt-5 py-3 px-4 rounded-xl bg-[#1A73E8] text-white font-semibold text-sm hover:bg-[#1557B0] active:scale-[0.99] transition"></button>
+      </form>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-[#323232] text-white text-xs font-medium shadow-lg whitespace-nowrap"></div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'filter_reminder_app_v1';
+
+      const CATEGORIES = {
+        hvac: {
+          bg: 'bg-[#D3E3FD]',
+          fg: 'text-[#1967D2]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor"></circle></svg>'
+        },
+        water: {
+          bg: 'bg-[#CCE8E8]',
+          fg: 'text-[#00796B]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3.5C12 3.5 6 10.5 6 14.5a6 6 0 0012 0c0-4-6-11-6-11z"></path></svg>'
+        },
+        fridge: {
+          bg: 'bg-[#E8EAED]',
+          fg: 'text-[#3C4043]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"></rect><path d="M6 10h12M9 6.5v1.5M9 13v3"></path></svg>'
+        },
+        air: {
+          bg: 'bg-[#E6F4EA]',
+          fg: 'text-[#137333]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 8h11a2.5 2.5 0 10-2.5-2.5M4 12h14a2.5 2.5 0 11-2.5 2.5M4 16h8"></path></svg>'
+        },
+        car: {
+          bg: 'bg-[#FEF7E0]',
+          fg: 'text-[#B06000]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l1.5-4.5A2 2 0 018.4 7h7.2a2 2 0 011.9 1.5L19 13M4 13h16v4a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H7v1a1 1 0 01-1 1H5a1 1 0 01-1-1v-4z"></path></svg>'
+        },
+        other: {
+          bg: 'bg-[#F3E8FD]',
+          fg: 'text-[#7627BB]',
+          svg: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>'
+        }
+      };
+
+      const I18N = {
+        en: {
+          appTitle: 'Filter Reminder',
+          settingsTitle: 'Settings',
+          tabAll: 'All',
+          tabOverdue: 'Overdue',
+          tabUpcoming: 'Upcoming',
+          sortDue: 'Due Date',
+          sortType: 'Type',
+          sortName: 'Name',
+          addFilter: 'Add Filter',
+          navFilters: 'Filters',
+          navSettings: 'Settings',
+          searchPlaceholder: 'Search location or filter...',
+          ok: 'OK',
+          dueToday: 'Due today',
+          daysOverdue: (n) => (n === 1 ? '1 day overdue' : `${n} days overdue`),
+          inDays: (n) => (n === 1 ? 'In 1 day' : `In ${n} days`),
+          emptyAllTitle: 'No filters yet',
+          emptyAllSub: 'Tap "+ Add Filter" to track your first filter.',
+          emptyOverdueTitle: 'Nothing overdue',
+          emptyOverdueSub: 'All your filters are up to date!',
+          emptyUpcomingTitle: 'No upcoming replacements',
+          emptyUpcomingSub: (d) => `No filters due in the next ${d} days.`,
+          catNames: {
+            hvac: 'HVAC / Furnace',
+            water: 'Water Filter',
+            fridge: 'Fridge',
+            air: 'Air Purifier',
+            car: 'Car Cabin',
+            other: 'Other'
+          },
+          lastReplaced: 'Last replaced',
+          nextDue: 'Next due',
+          interval: 'Interval',
+          daysUnit: 'days',
+          notes: 'Notes',
+          markReplaced: 'Mark as Replaced Today',
+          edit: 'Edit',
+          delete: 'Delete',
+          close: 'Close',
+          deleteConfirm: 'Delete this filter?',
+          cancel: 'Cancel',
+          formAddTitle: 'Add Filter',
+          formEditTitle: 'Edit Filter',
+          lblLocation: 'Location / Room',
+          phLocation: 'e.g. Basement, Kitchen',
+          lblCategory: 'Filter Type',
+          lblBrand: 'Brand / Model (optional)',
+          phBrand: 'e.g. Brita, MERV 11',
+          lblInterval: 'Replace every (days)',
+          lblLastReplaced: 'Last replaced date',
+          lblNotes: 'Notes / Size (optional)',
+          phNotes: 'e.g. 16x25x1',
+          save: 'Save Filter',
+          toastReplaced: 'Marked as replaced today',
+          toastAdded: 'Filter added',
+          toastUpdated: 'Filter updated',
+          toastDeleted: 'Filter deleted',
+          toastImported: 'Backup imported',
+          toastImportErr: 'Invalid backup file',
+          toastReset: 'Demo filters restored',
+          setLangTitle: 'Language',
+          setLangDesc: 'Switch interface language',
+          setUpcomingTitle: 'Upcoming window',
+          setUpcomingDesc: 'Days before due date to show in Upcoming',
+          setStatsTitle: 'Overview',
+          statTotal: 'Total',
+          statOverdue: 'Overdue',
+          statOk: 'Up to date',
+          setDataTitle: 'Backup & Data',
+          exportBtn: 'Export JSON',
+          importBtn: 'Import JSON',
+          resetDemo: 'Restore Demo Data'
+        },
+        ru: {
+          appTitle: 'Filter Reminder',
+          settingsTitle: 'Настройки',
+          tabAll: 'Все',
+          tabOverdue: 'Просрочено',
+          tabUpcoming: 'Скоро',
+          sortDue: 'По сроку',
+          sortType: 'По типу',
+          sortName: 'По имени',
+          addFilter: 'Добавить',
+          navFilters: 'Фильтры',
+          navSettings: 'Настройки',
+          searchPlaceholder: 'Поиск по месту или фильтру...',
+          ok: 'OK',
+          dueToday: 'Сегодня',
+          daysOverdue: (n) => `Просрочено: ${n} дн.`,
+          inDays: (n) => `Через ${n} дн.`,
+          emptyAllTitle: 'Фильтров пока нет',
+          emptyAllSub: 'Нажмите «+ Добавить», чтобы создать первый.',
+          emptyOverdueTitle: 'Просроченных нет',
+          emptyOverdueSub: 'Все фильтры заменены вовремя!',
+          emptyUpcomingTitle: 'Скорых замен нет',
+          emptyUpcomingSub: (d) => `В ближайшие ${d} дн. замен не требуется.`,
+          catNames: {
+            hvac: 'HVAC / Печь',
+            water: 'Фильтр воды',
+            fridge: 'Холодильник',
+            air: 'Очиститель',
+            car: 'Авто / Салон',
+            other: 'Другое'
+          },
+          lastReplaced: 'Последняя замена',
+          nextDue: 'Следующая замена',
+          interval: 'Интервал',
+          daysUnit: 'дн.',
+          notes: 'Заметки',
+          markReplaced: 'Отметить замену сегодня',
+          edit: 'Изменить',
+          delete: 'Удалить',
+          close: 'Закрыть',
+          deleteConfirm: 'Удалить этот фильтр?',
+          cancel: 'Отмена',
+          formAddTitle: 'Новый фильтр',
+          formEditTitle: 'Редактировать',
+          lblLocation: 'Место / Комната',
+          phLocation: 'Например: Подвал, Кухня',
+          lblCategory: 'Тип фильтра',
+          lblBrand: 'Бренд / Модель (необязательно)',
+          phBrand: 'Например: Brita, MERV 11',
+          lblInterval: 'Интервал замены (дней)',
+          lblLastReplaced: 'Дата последней замены',
+          lblNotes: 'Заметка / Размер (необязательно)',
+          phNotes: 'Например: 16x25x1',
+          save: 'Сохранить',
+          toastReplaced: 'Замена отмечена на сегодня',
+          toastAdded: 'Фильтр добавлен',
+          toastUpdated: 'Фильтр обновлён',
+          toastDeleted: 'Фильтр удалён',
+          toastImported: 'Резервная копия загружена',
+          toastImportErr: 'Неверный формат файла',
+          toastReset: 'Демо-данные восстановлены',
+          setLangTitle: 'Язык интерфейса',
+          setLangDesc: 'Переключение между русским и английским',
+          setUpcomingTitle: 'Порог «Скоро»',
+          setUpcomingDesc: 'За сколько дней показывать в «Скоро»',
+          setStatsTitle: 'Сводка',
+          statTotal: 'Всего',
+          statOverdue: 'Просрочено',
+          statOk: 'В норме',
+          setDataTitle: 'Данные и резервная копия',
+          exportBtn: 'Экспорт JSON',
+          importBtn: 'Импорт JSON',
+          resetDemo: 'Восстановить демо-данные'
+        }
+      };
+
+      function todayISO(offsetDays = 0) {
+        const d = new Date();
+        d.setHours(12, 0, 0, 0);
+        d.setDate(d.getDate() + offsetDays);
+        return d.toISOString().slice(0, 10);
+      }
+
+      function addDaysISO(iso, days) {
+        const [y, m, d] = iso.split('-').map(Number);
+        const dt = new Date(y, m - 1, d, 12, 0, 0);
+        dt.setDate(dt.getDate() + Number(days));
+        return dt.toISOString().slice(0, 10);
+      }
+
+      function diffDaysFromToday(targetISO) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+        const [y, m, d] = targetISO.split('-').map(Number);
+        const target = new Date(y, m - 1, d, 12, 0, 0);
+        return Math.round((target - today) / 86400000);
+      }
+
+      function formatDate(iso, lang) {
+        const [y, m, d] = iso.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        return dt.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+      }
+
+      function createDemoFilters() {
+        return [
+          {
+            id: 'f_basement',
+            location: 'Basement',
+            category: 'hvac',
+            brand: '',
+            intervalDays: 90,
+            lastReplaced: todayISO(-92),
+            notes: '16x25x1 MERV 11'
+          },
+          {
+            id: 'f_kitchen',
+            location: 'Kitchen',
+            category: 'water',
+            brand: 'Brita',
+            intervalDays: 60,
+            lastReplaced: todayISO(-20),
+            notes: 'Standard pitcher filter'
+          }
+        ];
+      }
+
+      let state = {
+        lang: 'ru',
+        nav: 'filters',
+        tab: 'all',
+        sort: 'dueDate',
+        search: '',
+        upcomingWindow: 14,
+        filters: createDemoFilters(),
+        activeDetailId: null,
+        editingId: null,
+        selectedCategory: 'hvac'
+      };
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.filters)) {
+              state.filters = parsed.filters;
+            }
+            if (parsed.lang === 'en' || parsed.lang === 'ru') {
+              state.lang = parsed.lang;
+            }
+            if (typeof parsed.upcomingWindow === 'number') {
+              state.upcomingWindow = parsed.upcomingWindow;
+            }
+          }
+        } catch (e) {
+          // Safe fallback to default state
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              lang: state.lang,
+              upcomingWindow: state.upcomingWindow,
+              filters: state.filters
+            })
+          );
+        } catch (e) {
+          // Ignore storage quota / sandbox restriction
+        }
+      }
+
+      function getFilterStatus(filter) {
+        const nextDue = addDaysISO(filter.lastReplaced, filter.intervalDays);
+        const daysLeft = diffDaysFromToday(nextDue);
+        let status = 'ok';
+        if (daysLeft < 0) status = 'overdue';
+        else if (daysLeft <= state.upcomingWindow) status = 'upcoming';
+        return { nextDue, daysLeft, status };
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          el.classList.add('hidden');
+        }, 2300);
+      }
+
+      function escapeHTML(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function render() {
+        const t = I18N[state.lang];
+
+        // Header & Nav visibility
+        const isFilters = state.nav === 'filters';
+        document.getElementById('headerTitle').textContent = isFilters ? t.appTitle : t.settingsTitle;
+        document.getElementById('headerSearchToggle').classList.toggle('hidden', !isFilters);
+        document.getElementById('tabsNav').classList.toggle('hidden', !isFilters);
+        document.getElementById('filtersView').classList.toggle('hidden', !isFilters);
+        document.getElementById('settingsView').classList.toggle('hidden', isFilters);
+        document.getElementById('addFilterFab').classList.toggle('hidden', !isFilters);
+        if (!isFilters) {
+          document.getElementById('searchBarWrap').classList.add('hidden');
+        }
+
+        // Bottom nav styles
+        document.getElementById('navFiltersLbl').textContent = t.navFilters;
+        document.getElementById('navSettingsLbl').textContent = t.navSettings;
+        document.querySelectorAll('.nav-btn').forEach((btn) => {
+          const active = btn.dataset.nav === state.nav;
+          const pill = btn.querySelector('.nav-pill');
+          pill.className = active
+            ? 'nav-pill px-5 py-1 rounded-full bg-[#C2E7FF] text-[#001D35] transition-colors'
+            : 'nav-pill px-5 py-1 rounded-full text-[#444746] transition-colors';
+          btn.querySelector('span:last-child').className = active
+            ? 'text-xs font-semibold text-[#1F1F1F]'
+            : 'text-xs font-medium text-[#444746]';
+        });
+
+        // Search input
+        document.getElementById('searchInput').placeholder = t.searchPlaceholder;
+        document.getElementById('fabLabel').textContent = t.addFilter;
+
+        // Compute statuses & counts
+        const enriched = state.filters.map((f) => ({
+          ...f,
+          ...getFilterStatus(f)
+        }));
+        const overdueCount = enriched.filter((f) => f.status === 'overdue').length;
+        const upcomingCount = enriched.filter((f) => f.status === 'upcoming').length;
+
+        const overdueBadge = document.getElementById('overdueBadge');
+        overdueBadge.textContent = overdueCount;
+        overdueBadge.classList.toggle('hidden', overdueCount === 0);
+
+        const upcomingBadge = document.getElementById('upcomingBadge');
+        upcomingBadge.textContent = upcomingCount;
+        upcomingBadge.classList.toggle('hidden', upcomingCount === 0);
+
+        // Tabs
+        const tabLabels = { all: t.tabAll, overdue: t.tabOverdue, upcoming: t.tabUpcoming };
+        document.querySelectorAll('.tab-btn').forEach((btn) => {
+          const key = btn.dataset.tab;
+          const active = key === state.tab;
+          btn.querySelector('.tab-label').textContent = tabLabels[key];
+          btn.classList.toggle('text-[#1A73E8]', active);
+          btn.classList.toggle('text-[#5F6368]', !active);
+          btn.querySelector('.tab-indicator').classList.toggle('hidden', !active);
+        });
+
+        // Sort chips
+        const sortLabels = { dueDate: t.sortDue, type: t.sortType, name: t.sortName };
+        document.querySelectorAll('.sort-chip').forEach((chip) => {
+          const key = chip.dataset.sort;
+          const active = key === state.sort;
+          chip.textContent = sortLabels[key];
+          chip.className = active
+            ? 'sort-chip shrink-0 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors border border-transparent bg-[#E2E4E9] text-[#1F1F1F]'
+            : 'sort-chip shrink-0 px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors border border-[#C4C7C5] bg-white text-[#444746] hover:bg-[#F1F3F4]';
+        });
+
+        // Filter & Sort list
+        let visible = enriched.filter((f) => {
+          if (state.tab === 'overdue' && f.status !== 'overdue') return false;
+          if (state.tab === 'upcoming' && f.status !== 'upcoming') return false;
+          if (state.search.trim()) {
+            const q = state.search.trim().toLowerCase();
+            const cat = (t.catNames[f.category] || '').toLowerCase();
+            return (
+              f.location.toLowerCase().includes(q) ||
+              (f.brand || '').toLowerCase().includes(q) ||
+              cat.includes(q)
+            );
+          }
+          return true;
+        });
+
+        visible.sort((a, b) => {
+          if (state.sort === 'dueDate') return a.daysLeft - b.daysLeft;
+          if (state.sort === 'type') {
+            return (t.catNames[a.category] || '').localeCompare(t.catNames[b.category] || '');
+          }
+          return a.location.localeCompare(b.location);
+        });
+
+        const listEl = document.getElementById('filterList');
+        const emptyEl = document.getElementById('emptyState');
+
+        if (visible.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          if (state.tab === 'overdue') {
+            document.getElementById('emptyTitle').textContent = t.emptyOverdueTitle;
+            document.getElementById('emptySubtitle').textContent = t.emptyOverdueSub;
+          } else if (state.tab === 'upcoming') {
+            document.getElementById('emptyTitle').textContent = t.emptyUpcomingTitle;
+            document.getElementById('emptySubtitle').textContent = t.emptyUpcomingSub(state.upcomingWindow);
+          } else {
+            document.getElementById('emptyTitle').textContent = t.emptyAllTitle;
+            document.getElementById('emptySubtitle').textContent = t.emptyAllSub;
+          }
+        } else {
+          emptyEl.classList.add('hidden');
+          listEl.innerHTML = visible
+            .map((f) => {
+              const cat = CATEGORIES[f.category] || CATEGORIES.other;
+              const catLabel = t.catNames[f.category] || t.catNames.other;
+              const sub = f.brand ? `${catLabel} · ${f.brand}` : catLabel;
+
+              let cardBorder = 'border-[#E0E3E7] bg-[#F1F3F6]/70';
+              let pillClass = 'bg-[#E6F4EA] text-[#137333]';
+              let pillText = t.ok;
+
+              if (f.status === 'overdue') {
+                cardBorder = 'border-[#D93025] bg-[#FFFFFF]';
+                pillClass = 'bg-[#FCE8E6] text-[#C5221F]';
+                pillText = t.daysOverdue(Math.abs(f.daysLeft));
+              } else if (f.status === 'upcoming') {
+                cardBorder = 'border-[#E0E3E7] bg-white';
+                pillClass = 'bg-[#FEF7E0] text-[#B06000]';
+                pillText = f.daysLeft === 0 ? t.dueToday : t.inDays(f.daysLeft);
+              }
+
+              return `
+                <button type="button" data-id="${escapeHTML(f.id)}" class="filter-card w-full text-left flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border ${cardBorder} hover:shadow-sm active:scale-[0.99] transition-all">
+                  <div class="flex items-center gap-3.5 min-w-0">
+                    <div class="w-11 h-11 rounded-full ${cat.bg} ${cat.fg} flex items-center justify-center shrink-0">
+                      ${cat.svg}
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-[16px] font-medium text-[#1F1F1F] truncate">${escapeHTML(f.location)}</div>
+                      <div class="text-[13px] text-[#5F6368] truncate">${escapeHTML(sub)}</div>
+                    </div>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${pillClass}">
+                    ${escapeHTML(pillText)}
+                  </span>
+                </button>
+              `;
+            })
+            .join('');
+        }
+
+        // Settings render
+        document.getElementById('setLangTitle').textContent = t.setLangTitle;
+        document.getElementById('setLangDesc').textContent = t.setLangDesc;
+        document.querySelectorAll('.lang-btn').forEach((btn) => {
+          const active = btn.dataset.lang === state.lang;
+          btn.className = active
+            ? 'lang-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-white text-[#1A73E8] shadow-sm transition-colors'
+            : 'lang-btn px-3 py-1.5 text-xs font-semibold rounded-lg text-[#5F6368] transition-colors';
+        });
+
+        document.getElementById('setUpcomingTitle').textContent = t.setUpcomingTitle;
+        document.getElementById('setUpcomingDesc').textContent = t.setUpcomingDesc;
+        document.getElementById('upcomingDaysVal').textContent = `${state.upcomingWindow} ${t.daysUnit}`;
+        document.querySelectorAll('.threshold-btn').forEach((btn) => {
+          const days = Number(btn.dataset.days);
+          const active = days === state.upcomingWindow;
+          btn.textContent = `${days} ${t.daysUnit}`;
+          btn.className = active
+            ? 'threshold-btn py-2 rounded-xl text-xs font-semibold border border-[#1A73E8] bg-[#E8F0FE] text-[#1967D2] transition-colors'
+            : 'threshold-btn py-2 rounded-xl text-xs font-medium border border-[#E0E3E7] bg-white text-[#444746] transition-colors';
+        });
+
+        document.getElementById('setStatsTitle').textContent = t.setStatsTitle;
+        document.getElementById('statTotal').textContent = enriched.length;
+        document.getElementById('statTotalLbl').textContent = t.statTotal;
+        document.getElementById('statOverdue').textContent = overdueCount;
+        document.getElementById('statOverdueLbl').textContent = t.statOverdue;
+        document.getElementById('statOk').textContent = enriched.length - overdueCount;
+        document.getElementById('statOkLbl').textContent = t.statOk;
+
+        document.getElementById('setDataTitle').textContent = t.setDataTitle;
+        document.getElementById('exportBtn').textContent = t.exportBtn;
+        document.getElementById('importLbl').textContent = t.importBtn;
+        document.getElementById('resetDemoBtn').textContent = t.resetDemo;
+      }
+
+      function openDetailModal(id) {
+        const f = state.filters.find((x) => x.id === id);
+        if (!f) return;
+        state.activeDetailId = id;
+        const t = I18N[state.lang];
+        const cat = CATEGORIES[f.category] || CATEGORIES.other;
+        const catLabel = t.catNames[f.category] || t.catNames.other;
+        const { nextDue, daysLeft, status } = getFilterStatus(f);
+
+        const iconWrap = document.getElementById('detailIconWrap');
+        iconWrap.className = `w-12 h-12 rounded-full ${cat.bg} ${cat.fg} flex items-center justify-center shrink-0`;
+        iconWrap.innerHTML = cat.svg;
+
+        document.getElementById('detailName').textContent = f.location;
+        document.getElementById('detailSub').textContent = f.brand ? `${catLabel} · ${f.brand}` : catLabel;
+
+        const pill = document.getElementById('detailStatusPill');
+        if (status === 'overdue') {
+          pill.className = 'px-3 py-1 rounded-full text-xs font-semibold shrink-0 bg-[#FCE8E6] text-[#C5221F]';
+          pill.textContent = t.daysOverdue(Math.abs(daysLeft));
+        } else if (status === 'upcoming') {
+          pill.className = 'px-3 py-1 rounded-full text-xs font-semibold shrink-0 bg-[#FEF7E0] text-[#B06000]';
+          pill.textContent = daysLeft === 0 ? t.dueToday : t.inDays(daysLeft);
+        } else {
+          pill.className = 'px-3 py-1 rounded-full text-xs font-semibold shrink-0 bg-[#E6F4EA] text-[#137333]';
+          pill.textContent = t.ok;
+        }
+
+        document.getElementById('detailLastLbl').textContent = t.lastReplaced;
+        document.getElementById('detailLastVal').textContent = formatDate(f.lastReplaced, state.lang);
+        document.getElementById('detailNextLbl').textContent = t.nextDue;
+        document.getElementById('detailNextVal').textContent = formatDate(nextDue, state.lang);
+        document.getElementById('detailIntervalLbl').textContent = t.interval;
+        document.getElementById('detailIntervalVal').textContent = `${f.intervalDays} ${t.daysUnit}`;
+
+        const notesRow = document.getElementById('detailNotesRow');
+        if (f.notes && f.notes.trim()) {
+          notesRow.classList.remove('hidden');
+          document.getElementById('detailNotesLbl').textContent = t.notes;
+          document.getElementById('detailNotesVal').textContent = f.notes;
+        } else {
+          notesRow.classList.add('hidden');
+        }
+
+        document.getElementById('markReplacedBtn').textContent = t.markReplaced;
+        document.getElementById('editFromDetailBtn').textContent = t.edit;
+        document.getElementById('deleteConfirmTriggerBtn').textContent = t.delete;
+        document.getElementById('closeDetailBtn').textContent = t.close;
+        document.getElementById('deleteConfirmText').textContent = t.deleteConfirm;
+        document.getElementById('cancelDeleteBtn').textContent = t.cancel;
+        document.getElementById('confirmDeleteBtn').textContent = t.delete;
+
+        document.getElementById('detailActionsMain').classList.remove('hidden');
+        document.getElementById('deleteConfirmBox').classList.add('hidden');
+        document.getElementById('detailModal').classList.remove('hidden');
+      }
+
+      function closeDetailModal() {
+        document.getElementById('detailModal').classList.add('hidden');
+        state.activeDetailId = null;
+      }
+
+      function renderCategoryGrid() {
+        const t = I18N[state.lang];
+        const grid = document.getElementById('categoryGrid');
+        grid.innerHTML = Object.keys(CATEGORIES)
+          .map((key) => {
+            const cat = CATEGORIES[key];
+            const active = state.selectedCategory === key;
+            const ring = active ? 'border-[#1A73E8] bg-[#E8F0FE]/60' : 'border-[#E0E3E7] bg-white';
+            return `
+              <button type="button" data-cat="${key}" class="cat-choice flex flex-col items-center gap-1 p-2.5 rounded-xl border ${ring} transition-colors">
+                <span class="w-8 h-8 rounded-full ${cat.bg} ${cat.fg} flex items-center justify-center">${cat.svg}</span>
+                <span class="text-[11px] font-medium text-[#1F1F1F] text-center leading-tight">${escapeHTML(t.catNames[key])}</span>
+              </button>
+            `;
+          })
+          .join('');
+      }
+
+      function openFormModal(editFilter = null) {
+        const t = I18N[state.lang];
+        state.editingId = editFilter ? editFilter.id : null;
+        state.selectedCategory = editFilter ? editFilter.category : 'hvac';
+
+        document.getElementById('formTitle').textContent = editFilter ? t.formEditTitle : t.formAddTitle;
+        document.getElementById('lblLocation').textContent = t.lblLocation;
+        document.getElementById('inpLocation').placeholder = t.phLocation;
+        document.getElementById('inpLocation').value = editFilter ? editFilter.location : '';
+
+        document.getElementById('lblCategory').textContent = t.lblCategory;
+        renderCategoryGrid();
+
+        document.getElementById('lblBrand').textContent = t.lblBrand;
+        document.getElementById('inpBrand').placeholder = t.phBrand;
+        document.getElementById('inpBrand').value = editFilter ? editFilter.brand || '' : '';
+
+        document.getElementById('lblInterval').textContent = t.lblInterval;
+        document.getElementById('inpInterval').value = editFilter ? editFilter.intervalDays : 90;
+
+        document.getElementById('lblLastReplaced').textContent = t.lblLastReplaced;
+        document.getElementById('inpLastReplaced').value = editFilter ? editFilter.lastReplaced : todayISO();
+
+        document.getElementById('lblNotes').textContent = t.lblNotes;
+        document.getElementById('inpNotes').placeholder = t.phNotes;
+        document.getElementById('inpNotes').value = editFilter ? editFilter.notes || '' : '';
+
+        document.getElementById('saveFilterBtn').textContent = t.save;
+        document.getElementById('formModal').classList.remove('hidden');
+      }
+
+      function closeFormModal() {
+        document.getElementById('formModal').classList.add('hidden');
+        state.editingId = null;
+      }
+
+      // Event Listeners
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.tab = btn.dataset.tab;
+          render();
+        });
+      });
+
+      document.querySelectorAll('.sort-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          state.sort = chip.dataset.sort;
+          render();
+        });
+      });
+
+      document.querySelectorAll('.nav-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.nav = btn.dataset.nav;
+          render();
+        });
+      });
+
+      document.getElementById('headerSearchToggle').addEventListener('click', () => {
+        const wrap = document.getElementById('searchBarWrap');
+        const willShow = wrap.classList.contains('hidden');
+        wrap.classList.toggle('hidden', !willShow);
+        if (willShow) {
+          document.getElementById('searchInput').focus();
+        } else {
+          state.search = '';
+          document.getElementById('searchInput').value = '';
+          document.getElementById('clearSearchBtn').classList.add('hidden');
+          render();
+        }
+      });
+
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        state.search = e.target.value;
+        document.getElementById('clearSearchBtn').classList.toggle('hidden', !state.search);
+        render();
+      });
+
+      document.getElementById('clearSearchBtn').addEventListener('click', () => {
+        state.search = '';
+        document.getElementById('searchInput').value = '';
+        document.getElementById('clearSearchBtn').classList.add('hidden');
+        render();
+      });
+
+      document.getElementById('filterList').addEventListener('click', (e) => {
+        const card = e.target.closest('.filter-card');
+        if (card) openDetailModal(card.dataset.id);
+      });
+
+      document.getElementById('addFilterFab').addEventListener('click', () => openFormModal(null));
+      document.getElementById('closeFormBtn').addEventListener('click', closeFormModal);
+      document.getElementById('formModal').addEventListener('click', (e) => {
+        if (e.target.id === 'formModal') closeFormModal();
+      });
+
+      document.getElementById('categoryGrid').addEventListener('click', (e) => {
+        const btn = e.target.closest('.cat-choice');
+        if (btn) {
+          state.selectedCategory = btn.dataset.cat;
+          renderCategoryGrid();
+        }
+      });
+
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.getElementById('inpInterval').value = btn.dataset.preset;
+        });
+      });
+
+      document.getElementById('filterForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const t = I18N[state.lang];
+        const location = document.getElementById('inpLocation').value.trim();
+        const brand = document.getElementById('inpBrand').value.trim();
+        const intervalDays = Math.max(1, parseInt(document.getElementById('inpInterval').value, 10) || 90);
+        const lastReplaced = document.getElementById('inpLastReplaced').value || todayISO();
+        const notes = document.getElementById('inpNotes').value.trim();
+
+        if (!location) return;
+
+        if (state.editingId) {
+          const idx = state.filters.findIndex((x) => x.id === state.editingId);
+          if (idx !== -1) {
+            state.filters[idx] = {
+              ...state.filters[idx],
+              location,
+              category: state.selectedCategory,
+              brand,
+              intervalDays,
+              lastReplaced,
+              notes
+            };
+          }
+          showToast(t.toastUpdated);
+        } else {
+          state.filters.push({
+            id: 'f_' + Date.now(),
+            location,
+            category: state.selectedCategory,
+            brand,
+            intervalDays,
+            lastReplaced,
+            notes
+          });
+          showToast(t.toastAdded);
+        }
+
+        saveState();
+        closeFormModal();
+        render();
+      });
+
+      document.getElementById('closeDetailBtn').addEventListener('click', closeDetailModal);
+      document.getElementById('detailModal').addEventListener('click', (e) => {
+        if (e.target.id === 'detailModal') closeDetailModal();
+      });
+
+      document.getElementById('markReplacedBtn').addEventListener('click', () => {
+        const f = state.filters.find((x) => x.id === state.activeDetailId);
+        if (!f) return;
+        f.lastReplaced = todayISO();
+        saveState();
+        closeDetailModal();
+        render();
+        showToast(I18N[state.lang].toastReplaced);
+      });
+
+      document.getElementById('editFromDetailBtn').addEventListener('click', () => {
+        const f = state.filters.find((x) => x.id === state.activeDetailId);
+        closeDetailModal();
+        if (f) openFormModal(f);
+      });
+
+      document.getElementById('deleteConfirmTriggerBtn').addEventListener('click', () => {
+        document.getElementById('detailActionsMain').classList.add('hidden');
+        document.getElementById('deleteConfirmBox').classList.remove('hidden');
+      });
+
+      document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+        document.getElementById('deleteConfirmBox').classList.add('hidden');
+        document.getElementById('detailActionsMain').classList.remove('hidden');
+      });
+
+      document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+        state.filters = state.filters.filter((x) => x.id !== state.activeDetailId);
+        saveState();
+        closeDetailModal();
+        render();
+        showToast(I18N[state.lang].toastDeleted);
+      });
+
+      // Settings listeners
+      document.querySelectorAll('.lang-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.lang = btn.dataset.lang;
+          saveState();
+          render();
+        });
+      });
+
+      document.querySelectorAll('.threshold-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.upcomingWindow = Number(btn.dataset.days);
+          saveState();
+          render();
+        });
+      });
+
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify({ filters: state.filters }, null, 2)], {
+          type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `filter-reminder-${todayISO()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+
+      document.getElementById('importInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            if (Array.isArray(parsed.filters)) {
+              state.filters = parsed.filters;
+              saveState();
+              render();
+              showToast(I18N[state.lang].toastImported);
+            } else {
+              showToast(I18N[state.lang].toastImportErr);
+            }
+          } catch (err) {
+            showToast(I18N[state.lang].toastImportErr);
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('resetDemoBtn').addEventListener('click', () => {
+        state.filters = createDemoFilters();
+        saveState();
+        render();
+        showToast(I18N[state.lang].toastReset);
+      });
+
+      loadState();
+      render();
+    })();
+  </script>
+</body>
+</html>
