@@ -276,6 +276,10 @@
         <div id="detailActionsMain" class="space-y-2.5">
           <button id="markReplacedBtn" type="button" class="w-full py-3 px-4 rounded-xl bg-[#1A73E8] text-white font-semibold text-sm hover:bg-[#1557B0] active:scale-[0.99] transition"></button>
           <div class="grid grid-cols-2 gap-2.5">
+            <button id="gcalBtn" type="button" class="py-2.5 px-3 rounded-xl bg-[#E8F0FE] text-[#1967D2] font-medium text-xs hover:bg-[#D2E3FC] transition flex items-center justify-center gap-1.5"></button>
+            <button id="icsBtn" type="button" class="py-2.5 px-3 rounded-xl bg-[#E8F0FE] text-[#1967D2] font-medium text-xs hover:bg-[#D2E3FC] transition flex items-center justify-center gap-1.5"></button>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
             <button id="editFromDetailBtn" type="button" class="py-2.5 px-4 rounded-xl bg-[#F1F3F4] text-[#1F1F1F] font-medium text-sm hover:bg-[#E8EAED] transition"></button>
             <button id="deleteConfirmTriggerBtn" type="button" class="py-2.5 px-4 rounded-xl bg-[#FCE8E6] text-[#C5221F] font-medium text-sm hover:bg-[#F9D2CE] transition"></button>
           </div>
@@ -428,6 +432,11 @@
           daysUnit: 'days',
           notes: 'Notes',
           markReplaced: 'Mark as Replaced Today',
+          gcalBtn: 'Google Calendar',
+          icsBtn: 'Calendar (.ics)',
+          calTitle: (name) => `Replace filter: ${name}`,
+          calDesc: (sub, interval, notes) => `Filter: ${sub}\nInterval: every ${interval} days${notes ? '\nNotes: ' + notes : ''}`,
+          toastIcs: 'Calendar reminder (.ics) saved',
           edit: 'Edit',
           delete: 'Delete',
           close: 'Close',
@@ -502,6 +511,11 @@
           daysUnit: 'дн.',
           notes: 'Заметки',
           markReplaced: 'Отметить замену сегодня',
+          gcalBtn: 'Google Календарь',
+          icsBtn: 'В календарь (.ics)',
+          calTitle: (name) => `Заменить фильтр: ${name}`,
+          calDesc: (sub, interval, notes) => `Фильтр: ${sub}\nИнтервал: каждые ${interval} дн.${notes ? '\nЗаметка: ' + notes : ''}`,
+          toastIcs: 'Файл напоминания (.ics) скачан',
           edit: 'Изменить',
           delete: 'Удалить',
           close: 'Закрыть',
@@ -906,6 +920,8 @@
         }
 
         document.getElementById('markReplacedBtn').textContent = t.markReplaced;
+        document.getElementById('gcalBtn').textContent = t.gcalBtn;
+        document.getElementById('icsBtn').textContent = t.icsBtn;
         document.getElementById('editFromDetailBtn').textContent = t.edit;
         document.getElementById('deleteConfirmTriggerBtn').textContent = t.delete;
         document.getElementById('closeDetailBtn').textContent = t.close;
@@ -1097,6 +1113,63 @@
       document.getElementById('closeDetailBtn').addEventListener('click', closeDetailModal);
       document.getElementById('detailModal').addEventListener('click', (e) => {
         if (e.target.id === 'detailModal') closeDetailModal();
+      });
+
+      document.getElementById('gcalBtn').addEventListener('click', () => {
+        const f = state.filters.find((x) => x.id === state.activeDetailId);
+        if (!f) return;
+        const t = I18N[state.lang];
+        const catLabel = t.catNames[f.category] || t.catNames.other;
+        const sub = f.brand ? `${catLabel} · ${f.brand}` : catLabel;
+        const { nextDue } = getFilterStatus(f);
+        const start = nextDue.replace(/-/g, '');
+        const end = addDaysISO(nextDue, 1).replace(/-/g, '');
+        const url = new URL('https://calendar.google.com/calendar/render');
+        url.searchParams.set('action', 'TEMPLATE');
+        url.searchParams.set('text', t.calTitle(f.location));
+        url.searchParams.set('dates', `${start}/${end}`);
+        url.searchParams.set('details', t.calDesc(sub, f.intervalDays, f.notes));
+        window.open(url.toString(), '_blank', 'noopener');
+      });
+
+      document.getElementById('icsBtn').addEventListener('click', () => {
+        const f = state.filters.find((x) => x.id === state.activeDetailId);
+        if (!f) return;
+        const t = I18N[state.lang];
+        const catLabel = t.catNames[f.category] || t.catNames.other;
+        const sub = f.brand ? `${catLabel} · ${f.brand}` : catLabel;
+        const { nextDue } = getFilterStatus(f);
+        const dtStart = nextDue.replace(/-/g, '') + 'T090000';
+        const dtEnd = nextDue.replace(/-/g, '') + 'T093000';
+        const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+        const ics = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Filter Reminder//PWA//EN',
+          'BEGIN:VEVENT',
+          `UID:${f.id}-${nextDue}@filter-reminder`,
+          `DTSTART:${dtStart}`,
+          `DTEND:${dtEnd}`,
+          `SUMMARY:${esc(t.calTitle(f.location))}`,
+          `DESCRIPTION:${esc(t.calDesc(sub, f.intervalDays, f.notes))}`,
+          'BEGIN:VALARM',
+          'TRIGGER:-PT0M',
+          'ACTION:DISPLAY',
+          `DESCRIPTION:${esc(t.calTitle(f.location))}`,
+          'END:VALARM',
+          'END:VEVENT',
+          'END:VCALENDAR'
+        ].join('\r\n');
+        const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `filter-${f.location.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-')}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast(t.toastIcs);
       });
 
       document.getElementById('markReplacedBtn').addEventListener('click', () => {
